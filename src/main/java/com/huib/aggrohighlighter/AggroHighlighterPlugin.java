@@ -2,15 +2,26 @@ package com.huib.aggrohighlighter;
 
 import com.google.inject.Provides;
 import javax.inject.Inject;
+
+import lombok.AccessLevel;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
+import net.runelite.api.NPC;
 import net.runelite.api.events.GameStateChanged;
+import net.runelite.api.events.NpcSpawned;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.game.npcoverlay.HighlightedNpc;
+import net.runelite.client.game.npcoverlay.NpcOverlayService;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.Function;
 
 @Slf4j
 @PluginDescriptor(
@@ -24,30 +35,66 @@ public class AggroHighlighterPlugin extends Plugin
 	@Inject
 	private AggroHighlighterConfig config;
 
+	@Inject
+	private NpcOverlayService npcOverlayService;
+
+	@Getter(AccessLevel.PACKAGE)
+	private final Map<NPC, HighlightedNpc> highlightedNpcs = new HashMap<>();
+
+	private final Function<NPC, HighlightedNpc> isHighlighted = highlightedNpcs::get;
+
 	@Override
 	protected void startUp() throws Exception
 	{
+		npcOverlayService.registerHighlighter(isHighlighted);
 		log.info("Aggro Highlighter started!");
 	}
 
 	@Override
 	protected void shutDown() throws Exception
 	{
+		npcOverlayService.unregisterHighlighter(isHighlighted);
 		log.info("Aggro Highlighter stopped!");
 	}
 
 	@Subscribe
 	public void onGameStateChanged(GameStateChanged gameStateChanged)
 	{
-		if (gameStateChanged.getGameState() == GameState.LOGGED_IN)
+		if (gameStateChanged.getGameState() == GameState.LOGIN_SCREEN ||
+				gameStateChanged.getGameState() == GameState.HOPPING)
 		{
-			client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "Aggro Highlighter says " + config.greeting(), null);
+			highlightedNpcs.clear();
 		}
+	}
+
+	@Subscribe
+	public void onNpcSpawned(NpcSpawned npcSpawned)
+	{
+		final NPC npc = npcSpawned.getNpc();
+		final String npcName = npc.getName();
+
+		if (npcName == null)
+		{
+			return;
+		}
+
+		log.info("NPC Spawned: " + npc.getName());
+		highlightedNpcs.put(npc, highlightedNpc(npc));
 	}
 
 	@Provides
 	AggroHighlighterConfig provideConfig(ConfigManager configManager)
 	{
 		return configManager.getConfig(AggroHighlighterConfig.class);
+	}
+
+	private HighlightedNpc highlightedNpc(NPC npc)
+	{
+		return HighlightedNpc.builder()
+				.npc(npc)
+				.highlightColor(config.aggroHighLightColor())
+				.borderWidth((float) config.borderWidth())
+				.render(x -> true)
+				.build();
 	}
 }
