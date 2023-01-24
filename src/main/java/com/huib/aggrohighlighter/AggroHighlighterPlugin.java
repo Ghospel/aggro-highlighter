@@ -37,9 +37,8 @@ public class AggroHighlighterPlugin extends Plugin
 
 	@Getter(AccessLevel.PACKAGE)
 	private final Map<NPC, HighlightedNpc> highlightedNpcs = new HashMap<>();
-	private final Map<NPC, HighlightedNpc> notHighlightedNpcs = new HashMap<>();
 
-	private final Map<Actor, NPC> actorNPCMap = new HashMap<>();
+	private final Map<Actor, NPC> actorsNpcs = new HashMap<>();
 
 	private final Function<NPC, HighlightedNpc> isHighlighted = highlightedNpcs::get;
 
@@ -57,6 +56,7 @@ public class AggroHighlighterPlugin extends Plugin
 	protected void shutDown() throws Exception
 	{
 		highlightedNpcs.clear();
+		actorsNpcs.clear();
 		npcOverlayService.unregisterHighlighter(isHighlighted);
 		log.info("Aggro Highlighter stopped");
 	}
@@ -68,6 +68,7 @@ public class AggroHighlighterPlugin extends Plugin
 				gameStateChanged.getGameState() == GameState.HOPPING)
 		{
 			highlightedNpcs.clear();
+			actorsNpcs.clear();
 		}
 	}
 
@@ -75,13 +76,11 @@ public class AggroHighlighterPlugin extends Plugin
 	public void onAnimationChanged(AnimationChanged e)
 	{
 		if(isInteractingWithLocalPlayer(e.getActor())){
-			NPC npc = actorNPCMap.get(e.getActor());
+			NPC npc = actorsNpcs.get(e.getActor());
 			if(hasAttackOption(npc))
 			{
-				log.info(e.getActor().getName() + " is attacking you");
 				log.info("Highlighting npc: " + npc.getName());
 				highlightedNpcs.put(npc, highlightedNpc(npc));
-				log.info("highlightedNPC count: " + highlightedNpcs.size());
 				npcOverlayService.registerHighlighter(isHighlighted);
 			}
 		}
@@ -107,12 +106,14 @@ public class AggroHighlighterPlugin extends Plugin
 			return;
 		}
 
-		log.info("NPC Spawned: " + npc.getName());
-		actorNPCMap.put(npcSpawned.getActor(), npcSpawned.getNpc());
+		actorsNpcs.put(npcSpawned.getActor(), npcSpawned.getNpc());
 	}
+
+	@Subscribe
 	public void onNpcDespawned(NpcDespawned npcDespawned)
 	{
 		final NPC npc = npcDespawned.getNpc();
+		actorsNpcs.remove(npcDespawned.getActor());
 		if(highlightedNpcs.containsKey(npc)){
 			highlightedNpcs.remove(npc);
 		}
@@ -131,12 +132,6 @@ public class AggroHighlighterPlugin extends Plugin
 				.highlightColor(config.aggroHighLightColor())
 				.outline(true)
 				.borderWidth((float) config.borderWidth())
-				.render(this::render)
 				.build();
-	}
-
-	private boolean render(NPC n)
-	{
-		return true;
 	}
 }
