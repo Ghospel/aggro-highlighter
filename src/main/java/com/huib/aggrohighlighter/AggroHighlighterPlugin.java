@@ -135,18 +135,8 @@ public class AggroHighlighterPlugin extends Plugin
 				.build();
 	}
 
-
 	private boolean render(NPC n)
 	{
 		return true;
 	}
-	
-//	private HighlightedNpc highlightedNpc(NPC npc)
-//	{
-//		return HighlightedNpc.builder()
-//				.npc(npc)
-//				.highlightColor(config.aggroHighLightColor())
-//				.borderWidth((float)config.borderWidth())
-//				.build();
-//	}
 }
